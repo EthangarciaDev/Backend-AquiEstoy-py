@@ -1,27 +1,32 @@
-# main.py (Ejemplo con FastAPI y Boto3)
+# main.py
 from fastapi import FastAPI
-import boto3
-import os
+from fastapi.middleware.cors import CORSMiddleware
+from app.core.config import settings
+from app.api.routes import health, s3, rekognition, test, auth, casos
 
-# 1. Cargar Variables de Entorno (Opcional, pero recomendado en desarrollo)
-# Debes configurar las credenciales de AWS aquí.
-# En producción, AWS las inyectará automáticamente a tu servicio.
-# En desarrollo local: export AWS_ACCESS_KEY_ID=... y export AWS_SECRET_ACCESS_KEY=...
+# Crear instancia de FastAPI
+app = FastAPI(
+    title=settings.APP_NAME,
+    debug=settings.DEBUG
+)
 
-app = FastAPI()
+# Configurar CORS
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-# 2. Inicializar los clientes de AWS
-# Boto3 leerá automáticamente las credenciales de tus variables de entorno.
-s3_client = boto3.client('s3', region_name=os.environ.get("AWS_REGION", "us-east-1"))
-rekognition_client = boto3.client('rekognition', region_name=os.environ.get("AWS_REGION", "us-east-1"))
+# Incluir rutas
+app.include_router(health.router, tags=["Health"])
+app.include_router(auth.router, prefix="/auth", tags=["Autenticación"])
+app.include_router(casos.router, prefix="/casos", tags=["Casos"])
+app.include_router(s3.router, prefix="/s3", tags=["S3"])
+app.include_router(rekognition.router, prefix="/rekognition", tags=["Rekognition"])
+app.include_router(test.router, prefix="/api", tags=["Test"])
 
-@app.get("/")
-def read_root():
-    return {"Hello": "Backend en Python listo para AWS"}
-
-# Aquí irán tus rutas para RDS, S3 y Rekognition.
-# Ejemplo de ruta para S3:
-# @app.post("/upload")
-# def upload_file_to_s3(file: UploadFile = File(...)):
-#     s3_client.upload_fileobj(file.file, "mi-bucket-de-s3", file.filename)
-#     return {"message": "File uploaded"}
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
